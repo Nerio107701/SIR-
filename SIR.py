@@ -3,13 +3,13 @@ from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 
 # Total population, N.
-N = 10000
+N = 1000
 # Initial number of infected and recovered individuals, I0 and R0.
-I0, R0 = 4, 0
+I0, R0 = 1, 0
 # Everyone else, S0, is susceptible to infection initially.
 S0 = N - I0 - R0
 # Contact rate, beta, and mean recovery rate, gamma, (in 1/days).
-beta, gamma = 0.9, 4.0 / 10
+beta, gamma = 0.2, 1.0 / 10
 # A grid of time points (in days)
 t = np.linspace(0, 160, 160)
 
