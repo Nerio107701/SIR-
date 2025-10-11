@@ -1,0 +1,89 @@
+"""
+CONTOUR LINES for SIR outcomes vs (beta, gamma)
+Run: python contour_sir.py
+This script:
+1) Same SIR setup as heatmap script
+2) Computes the same three outcomes on the (β, γ) grid
+3) Draws CONTOUR LINES (iso-values) so you can read exact thresholds
+   Also overlays several constant-R0 lines (R0=1, 1.5, 2, 3)
+"""
+
+import numpy as np
+from scipy.integrate import odeint
+import matplotlib.pyplot as plt
+
+# -----------------------------
+# Model + baseline parameters
+# -----------------------------
+N = 10_000
+I0, R0 = 4, 0
+S0 = N - I0 - R0
+y0 = (S0, I0, R0)
+t = np.linspace(0, 160, 160)  # days
+
+def deriv(y, t, N, beta, gamma):
+    S, I, R = y
+    dSdt = -beta * S * I / N
+    dIdt = beta * S * I / N - gamma * I
+    dRdt = gamma * I
+    return dSdt, dIdt, dRdt
+
+# ------------------------------------------
+# Parameter sweep (same ranges as heatmap)
+# ------------------------------------------
+beta_vals  = np.linspace(0.05, 1.2, 60)
+gamma_vals = np.linspace(0.05, 0.8, 60)
+
+peakI_grid  = np.zeros((len(gamma_vals), len(beta_vals)))
+tpeak_grid  = np.zeros_like(peakI_grid)
+Rfinal_grid = np.zeros_like(peakI_grid)
+
+for gi, gamma in enumerate(gamma_vals):
+    for bi, beta in enumerate(beta_vals):
+        sol = odeint(deriv, y0, t, args=(N, beta, gamma))
+        S, I, R = sol.T
+        peakI_grid[gi, bi]  = I.max()
+        tpeak_grid[gi, bi]  = t[I.argmax()]
+        Rfinal_grid[gi, bi] = R[-1]
+
+B, G = np.meshgrid(beta_vals, gamma_vals)
+R0_grid = B / G
+
+# -----------------------------
+# Plotting: contour lines only
+# -----------------------------
+def add_common(ax, title):
+    """Format axes and overlay constant-R0 guides."""
+    ax.set_xlabel('β (per day)')
+    ax.set_ylabel('γ (per day)')
+    ax.set_title(title)
+    # R0 = 1 boundary (epidemic threshold)
+    ax.contour(B, G, R0_grid, levels=[1.0], linestyles='--', linewidths=2)
+    # Optional: faint guides for other R0 levels
+    for r0 in [1.5, 2.0, 3.0]:
+        ax.contour(B, G, R0_grid, levels=[r0], linestyles=':', linewidths=1)
+
+# Choose sensible contour levels for readability
+levels_peak  = np.linspace(0.0, 0.6, 7)   # fractions of N for peak I/N
+levels_time  = np.linspace(10, 120, 8)    # days
+levels_final = np.linspace(0.0, 0.9, 10)  # fractions of N for final size
+
+# 1) Peak infected contours
+fig1, ax1 = plt.subplots(figsize=(7, 5))
+cs1 = ax1.contour(B, G, peakI_grid / N, levels=levels_peak)
+ax1.clabel(cs1, inline=True, fmt='%0.2f')  # label the contour lines
+add_common(ax1, 'Peak infected (I_peak / N) — contour lines')
+
+# 2) Time to peak contours
+fig2, ax2 = plt.subplots(figsize=(7, 5))
+cs2 = ax2.contour(B, G, tpeak_grid, levels=levels_time)
+ax2.clabel(cs2, inline=True, fmt='%0.0f d')
+add_common(ax2, 'Time of peak (days) — contour lines')
+
+# 3) Final size contours
+fig3, ax3 = plt.subplots(figsize=(7, 5))
+cs3 = ax3.contour(B, G, Rfinal_grid / N, levels=levels_final)
+ax3.clabel(cs3, inline=True, fmt='%0.2f')
+add_common(ax3, 'Final size (R(T≈∞) / N) — contour lines')
+
+plt.show()
